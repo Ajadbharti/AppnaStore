@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, Check, Sparkles, MapPin, Landmark } from 'lucide
 import Logo from '../components/Logo'
 import Stepper from '../components/Stepper'
 import Field from '../components/Field'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../store/AuthContext'
 
 const CATEGORIES = [
   'Kirana', 'Dairy', 'Fresh Vegetables', 'Fruits',
@@ -11,7 +13,7 @@ const CATEGORIES = [
 ]
 
 const initial = {
-  shopName: '', ownerName: '', mobile: '', email: '',
+  shopName: '', ownerName: '', mobile: '', email: '', password: '',
   address: '', area: '', city: '', pincode: '',
   radius: 3, openTime: '08:00', closeTime: '22:00', categories: [],
   gst: '', fssai: '', upi: '',
@@ -25,12 +27,13 @@ function validate(step, d, consent) {
     if (!d.ownerName.trim()) e.ownerName = 'Maalik ka naam likhein'
     if (!/^[6-9]\d{9}$/.test(d.mobile)) e.mobile = '10 digit ka sahi mobile number likhein'
     if (!/^\S+@\S+\.\S+$/.test(d.email)) e.email = 'Sahi email likhein'
+    if (d.password.length < 6) e.password = 'Password kam se kam 6 akshar ka rakhein'
   }
   if (step === 1) {
     if (!d.address.trim()) e.address = 'Dukaan ka address likhein'
     if (!d.area.trim()) e.area = 'Area ya mohalla likhein'
     if (!d.city.trim()) e.city = 'City likhein'
-    if (!/^\d{6}$/.test(d.pincode)) e.pincode = '6 digit ka pincode likhein'
+    if (!/^\d{6}$/.test(d.pincode)) e.pincode = '6 digit ka sahi pincode likhein'
     if (d.categories.length === 0) e.categories = 'Kam se kam ek category chuniye'
   }
   if (step === 2) {
@@ -48,10 +51,13 @@ function validate(step, d, consent) {
 
 export default function Register() {
   const navigate = useNavigate()
+  const { refreshShop } = useAuth()
   const [step, setStep] = useState(0)
   const [data, setData] = useState(initial)
   const [errors, setErrors] = useState({})
   const [consent, setConsent] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   const set = (k) => (e) => setData({ ...data, [k]: e.target.value })
   const setDigits = (k) => (e) =>
@@ -65,14 +71,74 @@ export default function Register() {
         : [...data.categories, c],
     })
 
-  const submit = () => {
-    // Demo: poora bank account number save nahi karte, sirf aakhri 4 digit
-    const { account, ...rest } = data
-    localStorage.setItem(
-      'apnastore_shop',
-      JSON.stringify({ ...rest, accountLast4: account.slice(-4) })
-    )
-    navigate('/partner')
+  const submit = async () => {
+    setSubmitting(true)
+    setSubmitError('')
+    try {
+      // 1. Account banayein (agar pehle se login nahi hai)
+      const { data: current } = await supabase.auth.getSession()
+      let user = current.session?.user
+
+      if (!user) {
+        const { data: auth, error } = await supabase.auth.signUp({
+          email: data.email.trim(),
+          password: data.password,
+        })
+        if (error) throw error
+        if (!auth.session) {
+          throw new Error(
+            'Email verify karna padega. Supabase mein Authentication ke andar "Confirm email" band karein, phir dobara koshish karein.'
+          )
+        }
+        user = auth.user
+      }
+
+      // 2. Dukaan ki public jaankari
+      const { data: shop, error: shopErr } = await supabase
+        .from('shops')
+        .upsert(
+          {
+            owner_id: user.id,
+            shop_name: data.shopName.trim(),
+            area: data.area.trim(),
+            city: data.city.trim(),
+            pincode: data.pincode,
+            radius: data.radius,
+            open_time: data.openTime,
+            close_time: data.closeTime,
+            categories: data.categories,
+          },
+          { onConflict: 'owner_id' }
+        )
+        .select()
+        .single()
+      if (shopErr) throw shopErr
+
+      // 3. Private jaankari (sirf maalik dekh sakta hai)
+      const { error: privErr } = await supabase.from('shop_private').upsert(
+        {
+          shop_id: shop.id,
+          owner_name: data.ownerName.trim(),
+          mobile: data.mobile,
+          email: data.email.trim(),
+          address: data.address.trim(),
+          gst: data.gst || null,
+          fssai: data.fssai || null,
+          upi: data.upi.trim() || null,
+          account_number: data.account,
+          ifsc: data.ifsc,
+        },
+        { onConflict: 'shop_id' }
+      )
+      if (privErr) throw privErr
+
+      await refreshShop(user)
+      navigate('/partner')
+    } catch (err) {
+      setSubmitError(err.message || 'Kuch galat ho gaya. Dobara koshish karein.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const next = () => {
@@ -90,6 +156,7 @@ export default function Register() {
   const back = () => {
     if (step === 0) return
     setErrors({})
+    setSubmitError('')
     setStep(step - 1)
   }
 
@@ -106,7 +173,7 @@ export default function Register() {
               Dukandar Registration
             </span>
           </div>
-          <Link to="/partner" className="text-muted no-underline">
+          <Link to="/login" className="text-muted no-underline">
             Already registered? Sign in
           </Link>
         </div>
@@ -141,8 +208,15 @@ export default function Register() {
                   value={data.mobile} onChange={setDigits('mobile')} />
               </Field>
               <Field label="Email" required error={errors.email}>
-                <input className="input" placeholder="dukaan@email.com" type="email"
+                <input className="input" placeholder="dukaan@email.com" type="email" autoComplete="email"
                   value={data.email} onChange={set('email')} />
+              </Field>
+              <Field
+                label="Password" required error={errors.password}
+                hint="Kam se kam 6 akshar. Isi se aap login karenge."
+              >
+                <input className="input" placeholder="••••••••" type="password" autoComplete="new-password"
+                  value={data.password} onChange={set('password')} />
               </Field>
             </div>
           )}
@@ -270,12 +344,16 @@ export default function Register() {
             </div>
           )}
 
+          {submitError && (
+            <p className="mt-8 rounded-2xl bg-red-50 px-5 py-3 text-red-700">{submitError}</p>
+          )}
+
           {/* Buttons */}
           <div className="mt-10 flex items-center justify-between">
             <button
               type="button"
               onClick={back}
-              disabled={step === 0}
+              disabled={step === 0 || submitting}
               className={
                 'flex items-center gap-2 border-0 bg-transparent px-4 py-3 text-lg ' +
                 (step === 0 ? 'cursor-default text-muted/60' : 'cursor-pointer text-ink')
@@ -284,8 +362,14 @@ export default function Register() {
               <ArrowLeft size={20} /> Peeche
             </button>
 
-            <button type="button" onClick={next} className="btn-primary text-lg">
-              {step === 3 ? 'Registration bhejein' : 'Aage badhein'} <ArrowRight size={20} />
+            <button
+              type="button"
+              onClick={next}
+              disabled={submitting}
+              className="btn-primary text-lg disabled:opacity-60"
+            >
+              {step === 3 ? (submitting ? 'Bhej rahe hain...' : 'Registration bhejein') : 'Aage badhein'}{' '}
+              <ArrowRight size={20} />
             </button>
           </div>
         </div>

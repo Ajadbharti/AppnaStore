@@ -7,7 +7,8 @@ export default function CartDrawer({ open, onClose }) {
   const { cartItems, cartTotal, changeQty, removeFromCart, placeOrder } = useStore()
   const [form, setForm] = useState({ customer: '', phone: '', area: '', payment: 'COD' })
   const [error, setError] = useState('')
-  const [placed, setPlaced] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [placed, setPlaced] = useState(null) // order codes ki list
 
   if (!open) return null
 
@@ -17,20 +18,32 @@ export default function CartDrawer({ open, onClose }) {
     onClose()
   }
 
-  const submit = () => {
+  const submit = async () => {
     if (!form.customer.trim()) return setError('Apna naam likhein')
     if (!/^[6-9]\d{9}$/.test(form.phone)) return setError('10 digit ka sahi mobile number likhein')
     if (!form.area.trim()) return setError('Delivery area likhein')
+
     setError('')
-    const id = placeOrder({
+    setBusy(true)
+    const res = await placeOrder({
       ...form,
       customer: form.customer.trim(),
       area: form.area.trim(),
     })
-    setPlaced(id)
+    setBusy(false)
+
+    if (res.error) {
+      setError(
+        res.error +
+          (res.codes.length ? ` (Ye order ho chuke hain: ${res.codes.join(', ')})` : '')
+      )
+      return
+    }
+    setPlaced(res.codes)
   }
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
+  const shopCount = new Set(cartItems.map((i) => i.shopId)).size
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -57,7 +70,9 @@ export default function CartDrawer({ open, onClose }) {
           <div className="flex flex-1 flex-col items-center justify-center gap-4 px-8 text-center">
             <CheckCircle2 size={72} className="text-leaf" strokeWidth={1.5} />
             <p className="font-display text-3xl font-bold">Order ho gaya!</p>
-            <p className="text-xl text-muted">Order number {placed}. Dukandar jaldi accept karenge.</p>
+            <p className="text-xl text-muted">
+              Order number: {placed.join(', ')}. Dukandar jaldi accept karenge.
+            </p>
             <button className="btn-primary mt-4" onClick={close}>Shopping jaari rakhein</button>
           </div>
         )}
@@ -82,7 +97,8 @@ export default function CartDrawer({ open, onClose }) {
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-display text-lg font-bold">{i.name}</p>
-                      <p className="text-muted">{i.unit} · ₹{i.price}</p>
+                      <p className="text-muted">{i.unit && `${i.unit} · `}₹{i.price}</p>
+                      <p className="truncate text-[14px] text-leaf">🏪 {i.shopName}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
@@ -112,6 +128,12 @@ export default function CartDrawer({ open, onClose }) {
                   </div>
                 ))}
               </div>
+
+              {shopCount > 1 && (
+                <p className="mt-4 rounded-2xl bg-sand px-4 py-3 text-[15px] text-muted">
+                  Aapke cart mein {shopCount} dukaanon ke items hain. Har dukaan ka alag order banega.
+                </p>
+              )}
 
               <div className="mt-6 grid gap-3 pb-6">
                 <input className="input" placeholder="Aapka naam" value={form.customer} onChange={set('customer')} />
@@ -148,8 +170,12 @@ export default function CartDrawer({ open, onClose }) {
                 <span className="text-lg text-muted">Total</span>
                 <span className="font-display text-3xl font-extrabold">₹{cartTotal}</span>
               </div>
-              <button className="btn-primary w-full text-lg" onClick={submit}>
-                Order place karein
+              <button
+                className="btn-primary w-full text-lg disabled:opacity-60"
+                onClick={submit}
+                disabled={busy}
+              >
+                {busy ? 'Order ho raha hai...' : 'Order place karein'}
               </button>
             </div>
           </>

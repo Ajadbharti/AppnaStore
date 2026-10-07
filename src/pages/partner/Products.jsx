@@ -3,39 +3,34 @@ import { Plus, Trash2 } from 'lucide-react'
 
 const empty = { name: '', category: '', price: '', unit: '', stock: '' }
 
-export default function Products({ products, setProducts }) {
+export default function Products({ products, onAdd, onToggle, onRemove }) {
   const [form, setForm] = useState(empty)
   const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
 
-  const add = () => {
+  const add = async () => {
     const price = Number(form.price)
     const stock = Number(form.stock || 0)
     if (!form.name.trim()) return setError('Product ka naam likhein')
     if (!(price > 0)) return setError('Sahi price likhein')
     if (stock < 0 || Number.isNaN(stock)) return setError('Sahi stock likhein')
 
+    setSaving(true)
     setError('')
-    setProducts([
-      {
-        id: Date.now(),
-        name: form.name.trim(),
-        category: form.category.trim() || 'Kirana',
-        unit: form.unit.trim(),
-        price,
-        stock,
-        inStock: stock > 0,
-      },
-      ...products,
-    ])
-    setForm(empty)
+    const err = await onAdd({
+      name: form.name.trim(),
+      category: form.category.trim() || 'Kirana',
+      unit: form.unit.trim(),
+      price,
+      stock,
+    })
+    setSaving(false)
+
+    if (err) setError(err)
+    else setForm(empty)
   }
-
-  const toggle = (id) =>
-    setProducts(products.map((p) => (p.id === id ? { ...p, inStock: !p.inStock } : p)))
-
-  const remove = (id) => setProducts(products.filter((p) => p.id !== id))
 
   const Label = ({ children }) => (
     <label className="mb-2 block text-[17px] text-muted">{children}</label>
@@ -76,8 +71,12 @@ export default function Products({ products, setProducts }) {
 
         {error && <p className="mt-4 text-[15px] text-red-600">{error}</p>}
 
-        <button className="btn-primary mt-7 !rounded-full text-lg" onClick={add}>
-          <Plus size={20} /> Product jodein
+        <button
+          className="btn-primary mt-7 text-lg disabled:opacity-60"
+          onClick={add}
+          disabled={saving}
+        >
+          <Plus size={20} /> {saving ? 'Save ho raha hai...' : 'Product jodein'}
         </button>
       </div>
 
@@ -112,7 +111,7 @@ export default function Products({ products, setProducts }) {
             <button
               role="switch"
               aria-checked={p.inStock}
-              onClick={() => toggle(p.id)}
+              onClick={() => onToggle(p.id, !p.inStock)}
               className={
                 'relative h-8 w-14 cursor-pointer rounded-full border-0 transition ' +
                 (p.inStock ? 'bg-brand' : 'bg-[#D9CFC4]')
@@ -126,7 +125,7 @@ export default function Products({ products, setProducts }) {
               />
             </button>
             <button
-              onClick={() => remove(p.id)}
+              onClick={() => onRemove(p.id)}
               aria-label="Delete"
               className="cursor-pointer border-0 bg-transparent text-muted"
             >

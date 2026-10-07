@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom'
 import { ClipboardList, IndianRupee, Truck, Package, BadgeCheck, Star, MapPin } from 'lucide-react'
 import OrderRow from '../../components/OrderRow'
-import { weekSales, weekDays, totalEarnings } from '../../data/mock'
 
 function Stat({ icon: Icon, value, label, accent }) {
   return (
@@ -31,12 +30,40 @@ function Row({ label, children }) {
   )
 }
 
+// Pichhle 7 din ki bikri (rejected orders ginte nahi)
+function lastSevenDays(orders) {
+  const days = []
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    d.setDate(d.getDate() - i)
+    days.push({
+      key: d.toDateString(),
+      label: d.toLocaleDateString('en-US', { weekday: 'short' }),
+      total: 0,
+    })
+  }
+  for (const o of orders) {
+    if (o.status === 'rejected') continue
+    const day = days.find((d) => d.key === new Date(o.createdAt).toDateString())
+    if (day) day.total += o.amount
+  }
+  return days
+}
+
 export default function Dashboard({ shop, orders, products, onStatus }) {
-  const todayCount = orders.filter((o) => o.when.startsWith('Today')).length
+  const todayKey = new Date().toDateString()
+  const todayCount = orders.filter((o) => new Date(o.createdAt).toDateString() === todayKey).length
   const newOrders = orders.filter((o) => o.status === 'new')
-  const outOfStock = products.filter((p) => !p.inStock).length
-  const max = Math.max(...weekSales)
-  const total = weekSales.reduce((a, b) => a + b, 0)
+  const earnings = orders
+    .filter((o) => o.status === 'delivered')
+    .reduce((sum, o) => sum + o.amount, 0)
+  const outOfStock = products.filter((p) => !p.inStock || p.stock <= 0).length
+
+  const week = lastSevenDays(orders)
+  const weekTotal = week.reduce((sum, d) => sum + d.total, 0)
+  const max = Math.max(1, ...week.map((d) => d.total))
+
   const place = [shop.area, shop.city].filter(Boolean).join(', ') || 'Address add karein'
 
   return (
@@ -49,7 +76,7 @@ export default function Dashboard({ shop, orders, products, onStatus }) {
       {/* 4 stat cards */}
       <div className="mt-10 grid gap-5 md:grid-cols-2">
         <Stat icon={ClipboardList} value={todayCount} label="Aaj ke orders" />
-        <Stat icon={IndianRupee} value={`₹${totalEarnings.toLocaleString('en-IN')}`} label="Total kamai" />
+        <Stat icon={IndianRupee} value={`₹${earnings.toLocaleString('en-IN')}`} label="Total kamai" />
         <Stat icon={Truck} value={newOrders.length} label="Naye orders" accent />
         <Stat icon={Package} value={outOfStock} label="Out of stock" />
       </div>
@@ -57,21 +84,21 @@ export default function Dashboard({ shop, orders, products, onStatus }) {
       {/* Weekly sales */}
       <div className="card mt-8 p-10">
         <h2 className="font-display text-2xl font-bold">Is hafte ki bikri</h2>
-        <p className="mt-1 text-lg text-muted">Total ₹{total.toLocaleString('en-IN')}</p>
+        <p className="mt-1 text-lg text-muted">Total ₹{weekTotal.toLocaleString('en-IN')}</p>
 
         <div className="mt-10 flex h-64 items-end gap-4">
-          {weekSales.map((v, i) => (
+          {week.map((d) => (
             <div
-              key={i}
-              title={`₹${v.toLocaleString('en-IN')}`}
+              key={d.key}
+              title={`₹${d.total.toLocaleString('en-IN')}`}
               className="flex-1 rounded-t-3xl bg-gradient-to-r from-brand to-brand-2"
-              style={{ height: `${(v / max) * 100}%` }}
+              style={{ height: `${Math.max(3, (d.total / max) * 100)}%` }}
             />
           ))}
         </div>
         <div className="mt-3 flex gap-4">
-          {weekDays.map((d) => (
-            <span key={d} className="flex-1 text-center text-muted">{d}</span>
+          {week.map((d) => (
+            <span key={d.key} className="flex-1 text-center text-muted">{d.label}</span>
           ))}
         </div>
       </div>
@@ -91,8 +118,8 @@ export default function Dashboard({ shop, orders, products, onStatus }) {
             </span>
           </Row>
           <Row label="Rating">
-            <span className="flex items-center gap-2 text-leaf">
-              <BadgeCheck size={22} /> 4.6 ★ (128 orders)
+            <span className="flex items-center gap-2 text-muted">
+              <Star size={22} /> Abhi koi rating nahi
             </span>
           </Row>
           <Row label="Delivery radius">{shop.radius} km</Row>

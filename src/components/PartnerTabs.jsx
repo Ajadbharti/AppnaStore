@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, ClipboardList, Package, Store, LogOut } from 'lucide-react'
+import { useAuth } from '../store/AuthContext'
 
 const tabs = [
   { to: '/partner', end: true, label: 'Dashboard', icon: LayoutDashboard },
@@ -10,6 +11,12 @@ const tabs = [
 
 export default function PartnerTabs({ newCount }) {
   const navigate = useNavigate()
+  const { signOut } = useAuth()
+
+  const logout = async () => {
+    await signOut()
+    navigate('/')
+  }
 
   return (
     <nav className="flex flex-wrap gap-3 py-8">
@@ -45,7 +52,7 @@ export default function PartnerTabs({ newCount }) {
       ))}
 
       <button
-        onClick={() => navigate('/')}
+        onClick={logout}
         className="inline-flex cursor-pointer items-center gap-2.5 rounded-2xl border border-line bg-transparent px-5 py-3.5 text-[17px] font-medium text-muted"
       >
         <LogOut size={20} /> Log out

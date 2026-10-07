@@ -15,6 +15,8 @@ export default function StoreHeader({
   cartCount = 0,
   onWishlistClick,
   wishlistCount = 0,
+  onLocationClick,
+  location,
   search = '',
   onSearch,
 }) {
@@ -23,10 +25,13 @@ export default function StoreHeader({
       <div className="mx-auto flex max-w-[1400px] items-center gap-6 px-6 py-3">
         <Logo />
 
-        <button className="hidden items-center gap-2 text-[15px] md:flex">
+        <button
+          onClick={onLocationClick}
+          className="hidden cursor-pointer items-center gap-2 text-[15px] md:flex"
+        >
           <MapPin size={18} className="text-brand" />
           <span className="text-muted">Deliver to:</span>
-          <span className="font-medium">Set location</span>
+          <span className="font-medium">{location?.pincode || 'Set location'}</span>
         </button>
 
         <div className="flex h-11 flex-1 items-center gap-3 rounded-full bg-sand px-5">

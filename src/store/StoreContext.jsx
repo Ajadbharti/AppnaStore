@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useState } from 'react'
-import { initialOrders, initialProducts } from '../data/mock'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
 
 const StoreContext = createContext(null)
 
@@ -24,11 +24,56 @@ function usePersistent(key, initial) {
   return [value, setValue]
 }
 
+const toProduct = (r) => ({
+  id: r.id,
+  name: r.name,
+  category: r.category,
+  unit: r.unit ?? '',
+  price: Number(r.price),
+  stock: r.stock,
+  inStock: r.in_stock,
+  shopId: r.shop_id,
+  shopName: r.shops?.shop_name ?? '',
+  shopArea: r.shops?.area ?? '',
+  pincode: r.shops?.pincode ?? '',
+})
+
 export function StoreProvider({ children }) {
-  const [products, setProducts] = usePersistent('apnastore_products', initialProducts)
-  const [orders, setOrders] = usePersistent('apnastore_orders', initialOrders)
-  const [cart, setCart] = usePersistent('apnastore_cart', []) // [{ id, qty }]
-  const [wishlist, setWishlist] = usePersistent('apnastore_wishlist', []) // [id, id, ...]
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const [cart, setCart] = usePersistent('apnastore_cart_v2', []) // [{ id, qty }]
+  const [wishlist, setWishlist] = usePersistent('apnastore_wishlist_v2', []) // [id, ...]
+  const [location, setLocation] = usePersistent('apnastore_location', null) // { pincode }
+
+  // Sirf wahi products jo stock mein hain
+  const loadProducts = useCallback(async () => {
+    const { data, error: err } = await supabase
+      .from('products')
+      .select('*, shops(shop_name, area, pincode)')
+      .eq('in_stock', true)
+      .gt('stock', 0)
+      .order('created_at', { ascending: false })
+
+    if (err) {
+      setError(err.message)
+    } else {
+      setError('')
+      setProducts(data.map(toProduct))
+    }
+    setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    loadProducts()
+    const timer = setInterval(loadProducts, 30000)
+    window.addEventListener('focus', loadProducts)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', loadProducts)
+    }
+  }, [loadProducts])
 
   const cartItems = cart.flatMap((c) => {
     const p = products.find((x) => x.id === c.id)
@@ -37,7 +82,6 @@ export function StoreProvider({ children }) {
   const cartCount = cartItems.reduce((n, i) => n + i.qty, 0)
   const cartTotal = cartItems.reduce((n, i) => n + i.qty * i.price, 0)
 
-  // Wishlist: sirf wahi products jo abhi bhi store mein hain
   const wishlistItems = wishlist.flatMap((id) => {
     const p = products.find((x) => x.id === id)
     return p ? [p] : []
@@ -70,53 +114,49 @@ export function StoreProvider({ children }) {
 
   const removeFromCart = (id) => setCart((prev) => prev.filter((c) => c.id !== id))
 
-  const placeOrder = ({ customer, phone, area, payment }) => {
-    if (cartItems.length === 0) return null
+  // Alag-alag dukaan ke items ke liye alag order banta hai
+  const placeOrder = async ({ customer, phone, area, payment }) => {
+    if (cartItems.length === 0) return { error: 'Cart khali hai', codes: [] }
 
-    const nums = orders.map((o) => Number(String(o.id).replace('AS-', '')) || 0)
-    const id = `AS-${Math.max(1000, ...nums) + 1}`
-    const time = new Date()
-      .toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
-      .toUpperCase()
-
-    const order = {
-      id,
-      status: 'new',
-      when: `Today, ${time}`,
-      customer,
-      area,
-      phone,
-      payment,
-      items: cartItems
-        .map((i) => `${[i.name, i.unit].filter(Boolean).join(' ')} ×${i.qty}`)
-        .join(', '),
-      amount: cartTotal,
+    const groups = {}
+    for (const i of cartItems) {
+      if (!groups[i.shopId]) groups[i.shopId] = []
+      groups[i.shopId].push(i)
     }
 
-    setOrders((prev) => [order, ...prev])
-
-    // Stock kam karein
-    setProducts((prev) =>
-      prev.map((p) => {
-        const line = cartItems.find((i) => i.id === p.id)
-        if (!line) return p
-        const stock = Math.max(0, p.stock - line.qty)
-        return { ...p, stock, inStock: stock > 0 && p.inStock }
+    const codes = []
+    for (const [shopId, items] of Object.entries(groups)) {
+      const { data, error: err } = await supabase.rpc('place_order', {
+        p_shop_id: shopId,
+        p_customer: customer,
+        p_phone: phone,
+        p_area: area,
+        p_payment: payment,
+        p_items: items.map((i) => ({ product_id: i.id, qty: i.qty })),
       })
-    )
 
-    setCart([])
-    return id
+      if (err) {
+        await loadProducts()
+        return { error: err.message, codes }
+      }
+
+      codes.push(data)
+      const ids = items.map((i) => i.id)
+      setCart((prev) => prev.filter((c) => !ids.includes(c.id)))
+    }
+
+    await loadProducts()
+    return { codes }
   }
 
   return (
     <StoreContext.Provider
       value={{
-        products, setProducts,
-        orders, setOrders,
+        products, loading, error, reload: loadProducts,
         cart, cartItems, cartCount, cartTotal,
         addToCart, changeQty, removeFromCart, placeOrder,
         wishlist, wishlistItems, toggleWishlist,
+        location, setLocation,
       }}
     >
       {children}

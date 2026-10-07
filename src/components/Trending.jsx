@@ -1,7 +1,7 @@
 import { Package } from 'lucide-react'
 import ProductCard from './ProductCard'
 
-export default function Trending({ products, filterLabel, onClear }) {
+export default function Trending({ products, filterLabel, onClear, loading, notice, onShowAll }) {
   return (
     <section id="trending" className="mx-auto max-w-[1400px] scroll-mt-24 px-8 pb-20 pt-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -18,7 +18,9 @@ export default function Trending({ products, filterLabel, onClear }) {
         )}
       </div>
 
-      {products.length > 0 ? (
+      {loading && products.length === 0 ? (
+        <p className="mt-10 text-xl text-muted">Products load ho rahe hain...</p>
+      ) : products.length > 0 ? (
         <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {products.map((p) => (
             <ProductCard key={p.id} product={p} />
@@ -34,6 +36,14 @@ export default function Trending({ products, filterLabel, onClear }) {
             Aapke store mein abhi koi product nahi hai. Mujhe chat mein bataiye —
             product ka naam aur price — main turant add kar dunga.
           </p>
+          {notice && (
+            <>
+              <p className="mt-6 text-lg font-medium text-ink">{notice}</p>
+              <button className="btn-primary mt-5" onClick={onShowAll}>
+                Sab dukaanein dikhayein
+              </button>
+            </>
+          )}
         </div>
       )}
     </section>

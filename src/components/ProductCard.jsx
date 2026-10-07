@@ -19,11 +19,7 @@ export default function ProductCard({ product }) {
           aria-pressed={wished}
           className="absolute right-3 top-3 grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-line bg-white shadow-sm"
         >
-          <Heart
-            size={20}
-            className="text-brand"
-            fill={wished ? 'currentColor' : 'none'}
-          />
+          <Heart size={20} className="text-brand" fill={wished ? 'currentColor' : 'none'} />
         </button>
       </div>
 
@@ -32,6 +28,12 @@ export default function ProductCard({ product }) {
         {product.category}
         {product.unit && ` · ${product.unit}`}
       </p>
+      {product.shopName && (
+        <p className="mt-1 text-[15px] font-medium text-leaf">
+          🏪 {product.shopName}
+          {product.shopArea && ` · ${product.shopArea}`}
+        </p>
+      )}
 
       <div className="mt-auto flex items-center justify-between pt-5">
         <span className="font-display text-2xl font-extrabold">₹{product.price}</span>
