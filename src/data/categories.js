@@ -12,7 +12,9 @@ export const storeCategories = [
 
 export function categoryOf(productCategory) {
   const key = (productCategory || '').trim().toLowerCase()
-  return storeCategories.find((c) => c.aliases.includes(key))
+  return storeCategories.find(
+    (c) => c.name.toLowerCase() === key || c.aliases.includes(key)
+  )
 }
 
 export function matchesCategory(selected, productCategory) {

@@ -77,6 +77,23 @@ export function usePartnerData(shopId) {
     }
   }, [load])
 
+  // Naya order aate hi turant refresh (Supabase Realtime)
+  useEffect(() => {
+    if (!shopId) return
+    const channel = supabase
+      .channel('orders-' + shopId)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders', filter: `shop_id=eq.${shopId}` },
+        () => load()
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [shopId, load])
+
   const addProduct = async (p) => {
     const { error: err } = await supabase.from('products').insert({
       shop_id: shopId,
@@ -87,6 +104,23 @@ export function usePartnerData(shopId) {
       stock: p.stock,
       in_stock: p.stock > 0,
     })
+    if (err) return err.message
+    await load()
+    return ''
+  }
+
+  const updateProduct = async (id, p) => {
+    const { error: err } = await supabase
+      .from('products')
+      .update({
+        name: p.name,
+        category: p.category,
+        unit: p.unit || null,
+        price: p.price,
+        stock: p.stock,
+        in_stock: p.inStock,
+      })
+      .eq('id', id)
     if (err) return err.message
     await load()
     return ''
@@ -116,6 +150,6 @@ export function usePartnerData(shopId) {
 
   return {
     products, orders, loading, error,
-    addProduct, toggleProduct, removeProduct, setOrderStatus,
+    addProduct, updateProduct, toggleProduct, removeProduct, setOrderStatus,
   }
 }

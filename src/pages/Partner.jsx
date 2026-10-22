@@ -46,9 +46,10 @@ export default function Partner() {
           <Route
             path="products"
             element={
-              <Products
+                           <Products
                 products={data.products}
                 onAdd={data.addProduct}
+                onUpdate={data.updateProduct}
                 onToggle={data.toggleProduct}
                 onRemove={data.removeProduct}
               />

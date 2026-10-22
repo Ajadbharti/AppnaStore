@@ -1,27 +1,52 @@
 import { useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Plus, Trash2, Pencil, Check, X } from 'lucide-react'
+import { storeCategories } from '../../data/categories'
 
-const empty = { name: '', category: '', price: '', unit: '', stock: '' }
+const catNames = storeCategories.map((c) => c.name)
+const emptyForm = { name: '', category: 'Kirana', price: '', unit: '', stock: '' }
 
-export default function Products({ products, onAdd, onToggle, onRemove }) {
-  const [form, setForm] = useState(empty)
+function CategorySelect({ value, onChange }) {
+  // Purane products ki category list mein na ho to bhi dikhe
+  const options = value && !catNames.includes(value) ? [value, ...catNames] : catNames
+  return (
+    <select className="input" value={value} onChange={onChange}>
+      {options.map((n) => (
+        <option key={n} value={n}>{n}</option>
+      ))}
+    </select>
+  )
+}
+
+const Label = ({ children }) => (
+  <label className="mb-2 block text-[17px] text-muted">{children}</label>
+)
+
+export default function Products({ products, onAdd, onUpdate, onToggle, onRemove }) {
+  // Naya product
+  const [form, setForm] = useState(emptyForm)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
+  // Edit
+  const [editId, setEditId] = useState(null)
+  const [draft, setDraft] = useState(null)
+  const [rowError, setRowError] = useState('')
+  const [rowSaving, setRowSaving] = useState(false)
+
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
+  const digits = (v) => v.replace(/\D/g, '')
 
   const add = async () => {
     const price = Number(form.price)
     const stock = Number(form.stock || 0)
     if (!form.name.trim()) return setError('Product ka naam likhein')
     if (!(price > 0)) return setError('Sahi price likhein')
-    if (stock < 0 || Number.isNaN(stock)) return setError('Sahi stock likhein')
 
     setSaving(true)
     setError('')
     const err = await onAdd({
       name: form.name.trim(),
-      category: form.category.trim() || 'Kirana',
+      category: form.category,
       unit: form.unit.trim(),
       price,
       stock,
@@ -29,12 +54,53 @@ export default function Products({ products, onAdd, onToggle, onRemove }) {
     setSaving(false)
 
     if (err) setError(err)
-    else setForm(empty)
+    else setForm(emptyForm)
   }
 
-  const Label = ({ children }) => (
-    <label className="mb-2 block text-[17px] text-muted">{children}</label>
-  )
+  const startEdit = (p) => {
+    setEditId(p.id)
+    setRowError('')
+    setDraft({
+      name: p.name,
+      category: p.category,
+      unit: p.unit,
+      price: String(p.price),
+      stock: String(p.stock),
+    })
+  }
+
+  const cancelEdit = () => {
+    setEditId(null)
+    setDraft(null)
+    setRowError('')
+  }
+
+  const saveEdit = async (p) => {
+    const price = Number(draft.price)
+    const stock = Number(draft.stock || 0)
+    if (!draft.name.trim()) return setRowError('Product ka naam likhein')
+    if (!(price > 0)) return setRowError('Sahi price likhein')
+
+    // Stock 0 ho to band; 0 se badhe to apne aap chalu; warna jaisa tha waisa
+    const inStock = stock === 0 ? false : p.stock === 0 ? true : p.inStock
+
+    setRowSaving(true)
+    setRowError('')
+    const err = await onUpdate(p.id, {
+      name: draft.name.trim(),
+      category: draft.category,
+      unit: draft.unit.trim(),
+      price,
+      stock,
+      inStock,
+    })
+    setRowSaving(false)
+
+    if (err) setRowError(err)
+    else cancelEdit()
+  }
+
+  const cols = 'grid-cols-[2fr_1fr_1fr_1fr_110px]'
 
   return (
     <div>
@@ -51,12 +117,12 @@ export default function Products({ products, onAdd, onToggle, onRemove }) {
           </div>
           <div>
             <Label>Category</Label>
-            <input className="input" placeholder="Kirana" value={form.category} onChange={set('category')} />
+            <CategorySelect value={form.category} onChange={set('category')} />
           </div>
           <div>
             <Label>Price (₹)</Label>
             <input className="input" placeholder="120" inputMode="numeric" value={form.price}
-              onChange={(e) => setForm({ ...form, price: e.target.value.replace(/\D/g, '') })} />
+              onChange={(e) => setForm({ ...form, price: digits(e.target.value) })} />
           </div>
           <div>
             <Label>Unit</Label>
@@ -65,7 +131,7 @@ export default function Products({ products, onAdd, onToggle, onRemove }) {
           <div>
             <Label>Stock</Label>
             <input className="input" placeholder="20" inputMode="numeric" value={form.stock}
-              onChange={(e) => setForm({ ...form, stock: e.target.value.replace(/\D/g, '') })} />
+              onChange={(e) => setForm({ ...form, stock: digits(e.target.value) })} />
           </div>
         </div>
 
@@ -82,7 +148,7 @@ export default function Products({ products, onAdd, onToggle, onRemove }) {
 
       {/* Table */}
       <div className="card mt-8 overflow-hidden">
-        <div className="grid grid-cols-[2fr_1fr_1fr_1fr_48px] items-center bg-sand/60 px-8 py-5 text-[15px] font-bold tracking-wide text-muted">
+        <div className={`grid ${cols} items-center bg-sand/60 px-8 py-5 text-[15px] font-bold tracking-wide text-muted`}>
           <span>PRODUCT</span>
           <span>PRICE</span>
           <span>STOCK</span>
@@ -94,45 +160,101 @@ export default function Products({ products, onAdd, onToggle, onRemove }) {
           <p className="px-8 py-10 text-center text-lg text-muted">Abhi koi product nahi hai.</p>
         )}
 
-        {products.map((p) => (
-          <div
-            key={p.id}
-            className="grid grid-cols-[2fr_1fr_1fr_1fr_48px] items-center border-t border-line px-8 py-5"
-          >
-            <div>
-              <p className="font-display text-xl font-bold">{p.name}</p>
-              <p className="text-muted">
-                {p.category}
-                {p.unit && ` · ${p.unit}`}
-              </p>
+        {products.map((p) =>
+          editId === p.id ? (
+            <div key={p.id} className="border-t border-line bg-cream px-8 py-6">
+              <div className="grid gap-x-6 gap-y-4 md:grid-cols-2">
+                <div>
+                  <Label>Naam</Label>
+                  <input className="input" value={draft.name}
+                    onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Category</Label>
+                  <CategorySelect value={draft.category}
+                    onChange={(e) => setDraft({ ...draft, category: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Price (₹)</Label>
+                  <input className="input" inputMode="numeric" value={draft.price}
+                    onChange={(e) => setDraft({ ...draft, price: digits(e.target.value) })} />
+                </div>
+                <div>
+                  <Label>Unit</Label>
+                  <input className="input" value={draft.unit}
+                    onChange={(e) => setDraft({ ...draft, unit: e.target.value })} />
+                </div>
+                <div>
+                  <Label>Stock</Label>
+                  <input className="input" inputMode="numeric" value={draft.stock}
+                    onChange={(e) => setDraft({ ...draft, stock: digits(e.target.value) })} />
+                </div>
+              </div>
+
+              {rowError && <p className="mt-4 text-[15px] text-red-600">{rowError}</p>}
+
+              <div className="mt-5 flex gap-3">
+                <button
+                  className="btn-primary btn-sm disabled:opacity-60"
+                  onClick={() => saveEdit(p)}
+                  disabled={rowSaving}
+                >
+                  <Check size={18} /> {rowSaving ? 'Save ho raha hai...' : 'Save karein'}
+                </button>
+                <button className="btn-ghost btn-sm" onClick={cancelEdit} disabled={rowSaving}>
+                  <X size={18} /> Cancel
+                </button>
+              </div>
             </div>
-            <span className="font-display text-xl font-bold">₹{p.price}</span>
-            <span className="text-xl">{p.stock}</span>
-            <button
-              role="switch"
-              aria-checked={p.inStock}
-              onClick={() => onToggle(p.id, !p.inStock)}
-              className={
-                'relative h-8 w-14 cursor-pointer rounded-full border-0 transition ' +
-                (p.inStock ? 'bg-brand' : 'bg-[#D9CFC4]')
-              }
+          ) : (
+            <div
+              key={p.id}
+              className={`grid ${cols} items-center border-t border-line px-8 py-5`}
             >
-              <span
+              <div>
+                <p className="font-display text-xl font-bold">{p.name}</p>
+                <p className="text-muted">
+                  {p.category}
+                  {p.unit && ` · ${p.unit}`}
+                </p>
+              </div>
+              <span className="font-display text-xl font-bold">₹{p.price}</span>
+              <span className="text-xl">{p.stock}</span>
+              <button
+                role="switch"
+                aria-checked={p.inStock}
+                onClick={() => onToggle(p.id, !p.inStock)}
                 className={
-                  'absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ' +
-                  (p.inStock ? 'left-7' : 'left-1')
+                  'relative h-8 w-14 cursor-pointer rounded-full border-0 transition ' +
+                  (p.inStock ? 'bg-brand' : 'bg-[#D9CFC4]')
                 }
-              />
-            </button>
-            <button
-              onClick={() => onRemove(p.id)}
-              aria-label="Delete"
-              className="cursor-pointer border-0 bg-transparent text-muted"
-            >
-              <Trash2 size={22} />
-            </button>
-          </div>
-        ))}
+              >
+                <span
+                  className={
+                    'absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ' +
+                    (p.inStock ? 'left-7' : 'left-1')
+                  }
+                />
+              </button>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => startEdit(p)}
+                  aria-label="Edit"
+                  className="cursor-pointer border-0 bg-transparent text-muted"
+                >
+                  <Pencil size={21} />
+                </button>
+                <button
+                  onClick={() => onRemove(p.id)}
+                  aria-label="Delete"
+                  className="cursor-pointer border-0 bg-transparent text-muted"
+                >
+                  <Trash2 size={22} />
+                </button>
+              </div>
+            </div>
+          )
+        )}
       </div>
     </div>
   )
