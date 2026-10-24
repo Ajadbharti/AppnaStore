@@ -41,7 +41,13 @@ export default function Partner() {
           />
           <Route
             path="orders"
-            element={<Orders orders={data.orders} onStatus={data.setOrderStatus} />}
+                        element={
+              <Orders
+                orders={data.orders}
+                onStatus={data.setOrderStatus}
+                onDeliver={data.confirmDelivery}
+              />
+            }
           />
           <Route
             path="products"

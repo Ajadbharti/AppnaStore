@@ -148,8 +148,30 @@ export function usePartnerData(shopId) {
     if (err) await load()
   }
 
+    // Delivery: grahak ke OTP se
+  const confirmDelivery = async (code, otp) => {
+    const { data, error: err } = await supabase.rpc('confirm_delivery', {
+      p_code: code,
+      p_otp: otp,
+    })
+    if (err) return err.message
+    if (data === 'ok') {
+      await load()
+      return ''
+    }
+    if (data === 'locked') {
+      return 'Bahut zyada galat OTP daale gaye. Ye order ab lock ho gaya hai.'
+    }
+    if (typeof data === 'string' && data.startsWith('wrong')) {
+      const left = data.split(':')[1]
+      return `OTP galat hai. ${left} koshish bachi hain.`
+    }
+    return 'Kuch galat ho gaya. Dobara koshish karein.'
+  }
+
   return {
     products, orders, loading, error,
     addProduct, updateProduct, toggleProduct, removeProduct, setOrderStatus,
+    confirmDelivery,
   }
 }

@@ -2,13 +2,18 @@ import { useState } from 'react'
 import { X, ShoppingBag, Plus, Minus, Trash2, CheckCircle2 } from 'lucide-react'
 import { emojiFor } from '../data/categories'
 import { useStore } from '../store/StoreContext'
+import { useAuth } from '../store/AuthContext'
+import Captcha from './Captcha'
 
 export default function CartDrawer({ open, onClose }) {
   const { cartItems, cartTotal, changeQty, removeFromCart, placeOrder } = useStore()
+  const { session } = useAuth()
   const [form, setForm] = useState({ customer: '', phone: '', area: '', payment: 'COD' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [placed, setPlaced] = useState(null) // order codes ki list
+  const [captcha, setCaptcha] = useState(null)
+  const [captchaKey, setCaptchaKey] = useState(0)
 
   if (!open) return null
 
@@ -22,6 +27,7 @@ export default function CartDrawer({ open, onClose }) {
     if (!form.customer.trim()) return setError('Apna naam likhein')
     if (!/^[6-9]\d{9}$/.test(form.phone)) return setError('10 digit ka sahi mobile number likhein')
     if (!form.area.trim()) return setError('Delivery area likhein')
+    if (!session && !captcha) return setError('Pehle captcha poora karein')
 
     setError('')
     setBusy(true)
@@ -29,8 +35,13 @@ export default function CartDrawer({ open, onClose }) {
       ...form,
       customer: form.customer.trim(),
       area: form.area.trim(),
+      captchaToken: captcha,
     })
     setBusy(false)
+
+    // Captcha ka token ek hi baar chalta hai
+    setCaptcha(null)
+    setCaptchaKey((k) => k + 1)
 
     if (res.error) {
       setError(
@@ -161,6 +172,8 @@ export default function CartDrawer({ open, onClose }) {
                     </button>
                   ))}
                 </div>
+
+                {!session && <Captcha onToken={setCaptcha} resetKey={captchaKey} />}
               </div>
             </div>
 

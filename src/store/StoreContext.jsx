@@ -115,8 +115,19 @@ export function StoreProvider({ children }) {
   const removeFromCart = (id) => setCart((prev) => prev.filter((c) => c.id !== id))
 
   // Alag-alag dukaan ke items ke liye alag order banta hai
-  const placeOrder = async ({ customer, phone, area, payment }) => {
+  const placeOrder = async ({ customer, phone, area, payment, captchaToken }) => {
     if (cartItems.length === 0) return { error: 'Cart khali hai', codes: [] }
+
+    // Session nahi hai to captcha ke saath anonymous session banayein
+    const { data: current } = await supabase.auth.getSession()
+    if (!current.session) {
+      const { error: authErr } = await supabase.auth.signInAnonymously({
+        options: { captchaToken },
+      })
+      if (authErr) {
+        return { error: 'Verification nahi ho paya. Captcha dobara poora karein.', codes: [] }
+      }
+    }
 
     const groups = {}
     for (const i of cartItems) {

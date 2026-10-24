@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { ArrowRight } from 'lucide-react'
 import Logo from '../components/Logo'
 import Field from '../components/Field'
+import Captcha from '../components/Captcha'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../store/AuthContext'
 
@@ -13,6 +14,8 @@ export default function Login() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [captcha, setCaptcha] = useState(null)
+  const [captchaKey, setCaptchaKey] = useState(0)
 
   // Pehle se login hai to seedha portal par
   useEffect(() => {
@@ -23,14 +26,20 @@ export default function Login() {
     e.preventDefault()
     if (!/^\S+@\S+\.\S+$/.test(email)) return setError('Sahi email likhein')
     if (!password) return setError('Password likhein')
+    if (!captcha) return setError('Pehle captcha poora karein')
 
     setBusy(true)
     setError('')
     const { error: err } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
+      options: { captchaToken: captcha },
     })
     setBusy(false)
+
+    // Captcha ka token ek hi baar chalta hai
+    setCaptcha(null)
+    setCaptchaKey((k) => k + 1)
 
     if (err) {
       setError(
@@ -98,6 +107,8 @@ export default function Login() {
                 value={password} onChange={(e) => setPassword(e.target.value)}
               />
             </Field>
+
+            <Captcha onToken={setCaptcha} resetKey={captchaKey} />
 
             {error && <p className="rounded-2xl bg-red-50 px-5 py-3 text-red-700">{error}</p>}
 

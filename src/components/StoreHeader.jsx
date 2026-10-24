@@ -1,4 +1,4 @@
-import { MapPin, Search, ShoppingBag, Heart } from 'lucide-react'
+import { MapPin, Search, ShoppingBag, Heart, ClipboardList } from 'lucide-react'
 import Logo from './Logo'
 
 function Badge({ n }) {
@@ -15,6 +15,7 @@ export default function StoreHeader({
   cartCount = 0,
   onWishlistClick,
   wishlistCount = 0,
+  onOrdersClick,
   onLocationClick,
   location,
   search = '',
@@ -43,6 +44,15 @@ export default function StoreHeader({
             className="w-full bg-transparent text-[15px] outline-none placeholder:text-muted"
           />
         </div>
+
+        <button
+          onClick={onOrdersClick}
+          className="relative grid h-11 w-11 cursor-pointer place-items-center rounded-full border border-line bg-white"
+          aria-label="Mere orders"
+          title="Mere orders"
+        >
+          <ClipboardList size={20} />
+        </button>
 
         <button
           onClick={onWishlistClick}

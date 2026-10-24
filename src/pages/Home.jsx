@@ -8,6 +8,7 @@ import Footer from '../components/Footer'
 import CartDrawer from '../components/CartDrawer'
 import WishlistDrawer from '../components/WishlistDrawer'
 import LocationModal from '../components/LocationModal'
+import MyOrdersDrawer from '../components/MyOrdersDrawer'
 import { useStore } from '../store/StoreContext'
 import { matchesCategory } from '../data/categories'
 
@@ -19,6 +20,7 @@ export default function Home() {
   const [cartOpen, setCartOpen] = useState(false)
   const [wishOpen, setWishOpen] = useState(false)
   const [locOpen, setLocOpen] = useState(false)
+  const [ordersOpen, setOrdersOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState(null)
 
@@ -56,6 +58,7 @@ export default function Home() {
         onWishlistClick={() => setWishOpen(true)}
         wishlistCount={wishlistItems.length}
         onLocationClick={() => setLocOpen(true)}
+        onOrdersClick={() => setOrdersOpen(true)}
         location={location}
         search={search}
         onSearch={setSearch}
@@ -82,6 +85,7 @@ export default function Home() {
 
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
       <WishlistDrawer open={wishOpen} onClose={() => setWishOpen(false)} />
+      <MyOrdersDrawer open={ordersOpen} onClose={() => setOrdersOpen(false)} />
       {locOpen && (
         <LocationModal
           current={pin}

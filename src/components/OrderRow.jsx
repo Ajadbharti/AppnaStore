@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 const badges = {
   new: { label: 'Naya', cls: 'border-[#F6C9B0] bg-[#FCE7DA] text-brand' },
   accepted: { label: 'Accepted', cls: 'border-[#C5DCCB] bg-[#E3EFE6] text-leaf' },
@@ -5,8 +7,21 @@ const badges = {
   rejected: { label: 'Rejected', cls: 'border-red-200 bg-red-50 text-red-600' },
 }
 
-export default function OrderRow({ order, onStatus, detailed }) {
+export default function OrderRow({ order, onStatus, onDeliver, detailed }) {
   const b = badges[order.status]
+  const [otp, setOtp] = useState('')
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const deliver = async () => {
+    if (!/^\d{4}$/.test(otp)) return setMsg('Grahak se 4 digit ka OTP lekar likhein')
+    setBusy(true)
+    setMsg('')
+    const err = await onDeliver(order.id, otp)
+    setBusy(false)
+    if (err) setMsg(err)
+    else setOtp('')
+  }
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-line bg-cream px-7 py-6">
@@ -24,7 +39,7 @@ export default function OrderRow({ order, onStatus, detailed }) {
         {detailed && <p className="mt-1 text-muted">{order.phone}</p>}
       </div>
 
-      <div className="flex items-center gap-5">
+      <div className="flex flex-wrap items-center gap-4">
         <span className="font-display text-2xl font-bold">₹{order.amount}</span>
 
         {order.status === 'new' && (
@@ -41,12 +56,28 @@ export default function OrderRow({ order, onStatus, detailed }) {
           </>
         )}
 
-        {order.status === 'accepted' && (
-          <button className="btn-primary btn-sm" onClick={() => onStatus(order.id, 'delivered')}>
-            Delivered
-          </button>
+        {order.status === 'accepted' && onDeliver && (
+          <div className="flex items-center gap-3">
+            <input
+              className="input !h-12 !w-32 text-center tracking-[0.3em]"
+              placeholder="OTP"
+              inputMode="numeric"
+              maxLength={4}
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+            />
+            <button
+              className="btn-primary btn-sm disabled:opacity-60"
+              onClick={deliver}
+              disabled={busy}
+            >
+              {busy ? 'Ruko...' : 'Deliver karein'}
+            </button>
+          </div>
         )}
       </div>
+
+      {msg && <p className="w-full text-[15px] text-red-600">{msg}</p>}
     </div>
   )
 }

@@ -46,7 +46,8 @@ export function AuthProvider({ children }) {
   const timer = useRef(null)
 
   const loadShop = useCallback(async (user) => {
-    if (!user) {
+    // Anonymous (captcha wale grahak) ki koi dukaan nahi hoti
+    if (!user || user.is_anonymous) {
       shopIdRef.current = null
       setShop(null)
       return null
@@ -129,7 +130,15 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, user: session?.user ?? null, shop, loading, updateShop, refreshShop, signOut }}
+      value={{
+        session,
+        user: session?.user && !session.user.is_anonymous ? session.user : null,
+        shop,
+        loading,
+        updateShop,
+        refreshShop,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>

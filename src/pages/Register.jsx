@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Check, Sparkles, MapPin, Landmark } from 'lucide
 import Logo from '../components/Logo'
 import Stepper from '../components/Stepper'
 import Field from '../components/Field'
+import Captcha from '../components/Captcha'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../store/AuthContext'
 
@@ -58,6 +59,8 @@ export default function Register() {
   const [consent, setConsent] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [captcha, setCaptcha] = useState(null)
+  const [captchaKey, setCaptchaKey] = useState(0)
 
   const set = (k) => (e) => setData({ ...data, [k]: e.target.value })
   const setDigits = (k) => (e) =>
@@ -75,14 +78,15 @@ export default function Register() {
     setSubmitting(true)
     setSubmitError('')
     try {
-      // 1. Account banayein (agar pehle se login nahi hai)
+      // 1. Account banayein (agar pehle se dukandar login nahi hai)
       const { data: current } = await supabase.auth.getSession()
       let user = current.session?.user
 
-      if (!user) {
+      if (!user || user.is_anonymous) {
         const { data: auth, error } = await supabase.auth.signUp({
           email: data.email.trim(),
           password: data.password,
+          options: { captchaToken: captcha },
         })
         if (error) throw error
         if (!auth.session) {
@@ -138,6 +142,9 @@ export default function Register() {
       setSubmitError(err.message || 'Kuch galat ho gaya. Dobara koshish karein.')
     } finally {
       setSubmitting(false)
+      // Captcha ka token ek hi baar chalta hai
+      setCaptcha(null)
+      setCaptchaKey((k) => k + 1)
     }
   }
 
@@ -149,6 +156,11 @@ export default function Register() {
       setStep(step + 1)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } else {
+      if (!captcha) {
+        setSubmitError('Pehle captcha poora karein')
+        return
+      }
+      setSubmitError('')
       submit()
     }
   }
@@ -340,6 +352,10 @@ export default function Register() {
                   Main maanta hoon ki di gayi jaankari sahi hai aur ApnaStore ke seller terms se sahamat hoon.
                 </label>
                 {errors.consent && <p className="mt-2 text-[15px] text-red-600">{errors.consent}</p>}
+              </div>
+
+              <div className="md:col-span-2">
+                <Captcha onToken={setCaptcha} resetKey={captchaKey} />
               </div>
             </div>
           )}
