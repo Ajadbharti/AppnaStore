@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import { X, ClipboardList, KeyRound } from 'lucide-react'
 import { useMyOrders } from '../lib/useMyOrders'
+import { useAuth } from '../store/AuthContext'
+import { supabase } from '../lib/supabase'
 
 const statusInfo = {
   new: { label: 'Dukandar ke accept karne ka intezaar', cls: 'border-[#F6C9B0] bg-[#FCE7DA] text-brand' },
@@ -10,8 +13,43 @@ const statusInfo = {
 
 export default function MyOrdersDrawer({ open, onClose }) {
   const { orders, loading } = useMyOrders(open)
+  const { session, user, signOut } = useAuth()
+  const [msg, setMsg] = useState('')
+  const [alreadyLinked, setAlreadyLinked] = useState(false)
 
   if (!open) return null
+
+  const redirectTo = window.location.origin
+  const isGuest = session?.user?.is_anonymous
+
+  // Seedha Google se login (naya visitor, ya purana Google account)
+  const googleLogin = async () => {
+    setMsg('')
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo },
+    })
+    if (error) setMsg(error.message)
+  }
+
+  // Guest session ko Google account se jodna (purane orders sath rehte hain)
+  const linkGoogle = async () => {
+    setMsg('')
+    setAlreadyLinked(false)
+    const { error } = await supabase.auth.linkIdentity({
+      provider: 'google',
+      options: { redirectTo },
+    })
+    if (!error) return
+
+    if (/already/i.test(error.message)) {
+      setAlreadyLinked(true)
+    } else if (/manual linking/i.test(error.message)) {
+      setMsg('Supabase mein "Allow manual linking" ON karna zaroori hai.')
+    } else {
+      setMsg(error.message)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
@@ -29,6 +67,46 @@ export default function MyOrdersDrawer({ open, onClose }) {
         <div className="p-8 pb-4">
           <h2 className="font-display text-3xl font-bold">Mere Orders</h2>
           <p className="mt-2 text-lg text-muted">Order ka status aur delivery OTP yahan dikhega.</p>
+        </div>
+
+        {/* Login ka hissa */}
+        <div className="mx-8 mb-4 rounded-2xl border border-line bg-white p-4">
+          {user ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="min-w-0 truncate text-[15px] text-muted">
+                ✅ <b className="text-ink">{user.email}</b> se login hai
+              </p>
+              <button
+                onClick={signOut}
+                className="cursor-pointer border-0 bg-transparent text-[15px] text-muted underline"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            <>
+              <p className="text-[15px] text-muted">
+                Kisi bhi phone par apne orders aur delivery OTP dekhne ke liye login karein.
+              </p>
+              <button
+                className="btn-ghost btn-sm mt-3"
+                onClick={isGuest ? linkGoogle : googleLogin}
+              >
+                <span className="font-bold text-brand">G</span> Google se login karein
+              </button>
+
+              {alreadyLinked && (
+                <div className="mt-3 rounded-xl bg-sand p-3 text-[14px] text-muted">
+                  Ye Google account pehle se juda hai. Seedha login karne par is phone ke
+                  purane guest orders us account mein nahi aayenge.
+                  <button className="btn-primary btn-sm mt-3" onClick={googleLogin}>
+                    Phir bhi seedha login karein
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+          {msg && <p className="mt-3 text-[14px] text-red-600">{msg}</p>}
         </div>
 
         {orders.length === 0 ? (

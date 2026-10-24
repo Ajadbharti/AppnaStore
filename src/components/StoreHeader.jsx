@@ -45,13 +45,13 @@ export default function StoreHeader({
           />
         </div>
 
-        <button
+                <button
           onClick={onOrdersClick}
-          className="relative grid h-11 w-11 cursor-pointer place-items-center rounded-full border border-line bg-white"
+          className="flex h-11 cursor-pointer items-center gap-2 rounded-full border border-line bg-white px-3.5 text-[15px] font-medium"
           aria-label="Mere orders"
-          title="Mere orders"
         >
           <ClipboardList size={20} />
+          <span className="hidden lg:inline">Mere Orders</span>
         </button>
 
         <button

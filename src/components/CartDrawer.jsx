@@ -5,7 +5,7 @@ import { useStore } from '../store/StoreContext'
 import { useAuth } from '../store/AuthContext'
 import Captcha from './Captcha'
 
-export default function CartDrawer({ open, onClose }) {
+export default function CartDrawer({ open, onClose, onViewOrders }) {
   const { cartItems, cartTotal, changeQty, removeFromCart, placeOrder } = useStore()
   const { session } = useAuth()
   const [form, setForm] = useState({ customer: '', phone: '', area: '', payment: 'COD' })
@@ -84,7 +84,20 @@ export default function CartDrawer({ open, onClose }) {
             <p className="text-xl text-muted">
               Order number: {placed.join(', ')}. Dukandar jaldi accept karenge.
             </p>
-            <button className="btn-primary mt-4" onClick={close}>Shopping jaari rakhein</button>
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
+              {onViewOrders && (
+                <button
+                  className="btn-primary"
+                  onClick={() => {
+                    close()
+                    onViewOrders()
+                  }}
+                >
+                  Mere Orders dekhein
+                </button>
+              )}
+              <button className="btn-ghost" onClick={close}>Shopping jaari rakhein</button>
+            </div>
           </div>
         )}
 

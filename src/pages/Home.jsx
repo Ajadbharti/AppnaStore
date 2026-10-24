@@ -83,7 +83,11 @@ export default function Home() {
       <HowItWorks />
       <Footer />
 
-      <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
+      <CartDrawer
+        open={cartOpen}
+        onClose={() => setCartOpen(false)}
+        onViewOrders={() => setOrdersOpen(true)}
+      />
       <WishlistDrawer open={wishOpen} onClose={() => setWishOpen(false)} />
       <MyOrdersDrawer open={ordersOpen} onClose={() => setOrdersOpen(false)} />
       {locOpen && (
