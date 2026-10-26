@@ -1,6 +1,6 @@
 import { X, Heart, ShoppingBag, Check } from 'lucide-react'
-import { emojiFor } from '../data/categories'
 import { useStore } from '../store/StoreContext'
+import ProductThumb from './ProductThumb'
 
 export default function WishlistDrawer({ open, onClose }) {
   const { wishlistItems, toggleWishlist, cart, addToCart } = useStore()
@@ -44,15 +44,16 @@ export default function WishlistDrawer({ open, onClose }) {
 
                 return (
                   <div key={p.id} className="card flex items-center gap-4 p-4">
-                    <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-sand text-3xl">
-                      {emojiFor(p.category)}
-                    </span>
+                    <ProductThumb product={p} className="h-14 w-14 text-3xl" />
 
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-display text-lg font-bold">{p.name}</p>
                       <p className="text-muted">
                         {p.unit && `${p.unit} · `}₹{p.price}
                       </p>
+                      {p.shopName && (
+                        <p className="truncate text-[14px] text-leaf">🏪 {p.shopName}</p>
+                      )}
                     </div>
 
                     {!available ? (

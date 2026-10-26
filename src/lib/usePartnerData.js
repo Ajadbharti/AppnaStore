@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from './supabase'
+import { productImageUrl, uploadProductImage, deleteProductImage } from './images'
 
 const toProduct = (r) => ({
   id: r.id,
@@ -9,6 +10,8 @@ const toProduct = (r) => ({
   price: Number(r.price),
   stock: r.stock,
   inStock: r.in_stock,
+  imagePath: r.image_path ?? null,
+  imageUrl: productImageUrl(r.image_path),
 })
 
 function formatWhen(iso) {
@@ -31,6 +34,7 @@ const toOrder = (r) => ({
   status: r.status,
   when: formatWhen(r.created_at),
   createdAt: r.created_at,
+  deliveredAt: r.delivered_at,
   customer: r.customer_name,
   area: r.area,
   phone: r.phone,
@@ -77,14 +81,19 @@ export function usePartnerData(shopId) {
     }
   }, [load])
 
-  // Naya order aate hi turant refresh (Supabase Realtime)
+  // Naya order ya stock badalte hi turant refresh (Supabase Realtime)
   useEffect(() => {
     if (!shopId) return
     const channel = supabase
-      .channel('orders-' + shopId)
+      .channel('shop-' + shopId)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'orders', filter: `shop_id=eq.${shopId}` },
+        () => load()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products', filter: `shop_id=eq.${shopId}` },
         () => load()
       )
       .subscribe()
@@ -94,7 +103,15 @@ export function usePartnerData(shopId) {
     }
   }, [shopId, load])
 
+  // p.imageFile ho to photo upload hoti hai
   const addProduct = async (p) => {
+    let imagePath = null
+    if (p.imageFile) {
+      const up = await uploadProductImage(shopId, p.imageFile)
+      if (up.error) return up.error
+      imagePath = up.path
+    }
+
     const { error: err } = await supabase.from('products').insert({
       shop_id: shopId,
       name: p.name,
@@ -103,13 +120,30 @@ export function usePartnerData(shopId) {
       price: p.price,
       stock: p.stock,
       in_stock: p.stock > 0,
+      image_path: imagePath,
     })
-    if (err) return err.message
+    if (err) {
+      if (imagePath) await deleteProductImage(imagePath)
+      return err.message
+    }
     await load()
     return ''
   }
 
+  // p.imageFile = nayi photo, p.removeImage = photo hatana, p.imagePath = abhi ki photo
   const updateProduct = async (id, p) => {
+    let imagePath = p.imagePath ?? null
+    let uploaded = null
+
+    if (p.imageFile) {
+      const up = await uploadProductImage(shopId, p.imageFile)
+      if (up.error) return up.error
+      uploaded = up.path
+      imagePath = up.path
+    } else if (p.removeImage) {
+      imagePath = null
+    }
+
     const { error: err } = await supabase
       .from('products')
       .update({
@@ -119,9 +153,19 @@ export function usePartnerData(shopId) {
         price: p.price,
         stock: p.stock,
         in_stock: p.inStock,
+        image_path: imagePath,
       })
       .eq('id', id)
-    if (err) return err.message
+
+    if (err) {
+      if (uploaded) await deleteProductImage(uploaded)
+      return err.message
+    }
+
+    // Purani photo hata dein
+    if ((uploaded || p.removeImage) && p.imagePath) {
+      await deleteProductImage(p.imagePath)
+    }
     await load()
     return ''
   }
@@ -134,9 +178,14 @@ export function usePartnerData(shopId) {
   }
 
   const removeProduct = async (id) => {
+    const target = products.find((x) => x.id === id)
     setProducts((prev) => prev.filter((x) => x.id !== id))
     const { error: err } = await supabase.from('products').delete().eq('id', id)
-    if (err) await load()
+    if (err) {
+      await load()
+      return
+    }
+    if (target?.imagePath) await deleteProductImage(target.imagePath)
   }
 
   const setOrderStatus = async (code, status) => {
@@ -148,7 +197,7 @@ export function usePartnerData(shopId) {
     if (err) await load()
   }
 
-    // Delivery: grahak ke OTP se
+  // Delivery: grahak ke OTP se
   const confirmDelivery = async (code, otp) => {
     const { data, error: err } = await supabase.rpc('confirm_delivery', {
       p_code: code,

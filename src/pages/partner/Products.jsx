@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { Plus, Trash2, Pencil, Check, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Plus, Trash2, Pencil, Check, X, ImagePlus } from 'lucide-react'
 import { storeCategories } from '../../data/categories'
+import { validateImage } from '../../lib/images'
+import ProductThumb from '../../components/ProductThumb'
 
 const catNames = storeCategories.map((c) => c.name)
-const emptyForm = { name: '', category: 'Kirana', price: '', unit: '', stock: '' }
+const emptyForm = { name: '', category: 'Kirana', price: '', unit: '', stock: '', imageFile: null }
 
 function CategorySelect({ value, onChange }) {
   // Purane products ki category list mein na ho to bhi dikhe
@@ -20,6 +22,62 @@ function CategorySelect({ value, onChange }) {
 const Label = ({ children }) => (
   <label className="mb-2 block text-[17px] text-muted">{children}</label>
 )
+
+// Photo chunne ka box
+function ImagePicker({ file, existingUrl, removed, onPick, onRemove }) {
+  const [preview, setPreview] = useState('')
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    if (!file) {
+      setPreview('')
+      return
+    }
+    const url = URL.createObjectURL(file)
+    setPreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [file])
+
+  const shown = preview || (removed ? '' : existingUrl)
+
+  return (
+    <div className="flex items-center gap-4">
+      <div className="grid h-24 w-24 shrink-0 place-items-center overflow-hidden rounded-2xl border border-dashed border-[#D9CFC4] bg-white text-muted">
+        {shown ? (
+          <img src={shown} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <ImagePlus size={28} />
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className="btn-ghost btn-sm" onClick={() => inputRef.current?.click()}>
+          {shown ? 'Photo badlein' : 'Photo chunein'}
+        </button>
+        {shown && (
+          <button
+            type="button"
+            onClick={onRemove}
+            className="cursor-pointer border-0 bg-transparent text-muted underline"
+          >
+            Hatayein
+          </button>
+        )}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) onPick(f)
+            e.target.value = ''
+          }}
+        />
+      </div>
+    </div>
+  )
+}
 
 export default function Products({ products, onAdd, onUpdate, onToggle, onRemove }) {
   // Naya product
@@ -50,6 +108,7 @@ export default function Products({ products, onAdd, onUpdate, onToggle, onRemove
       unit: form.unit.trim(),
       price,
       stock,
+      imageFile: form.imageFile,
     })
     setSaving(false)
 
@@ -66,6 +125,8 @@ export default function Products({ products, onAdd, onUpdate, onToggle, onRemove
       unit: p.unit,
       price: String(p.price),
       stock: String(p.stock),
+      imageFile: null,
+      removeImage: false,
     })
   }
 
@@ -93,6 +154,9 @@ export default function Products({ products, onAdd, onUpdate, onToggle, onRemove
       price,
       stock,
       inStock,
+      imagePath: p.imagePath,
+      imageFile: draft.imageFile,
+      removeImage: draft.removeImage,
     })
     setRowSaving(false)
 
@@ -132,6 +196,20 @@ export default function Products({ products, onAdd, onUpdate, onToggle, onRemove
             <Label>Stock</Label>
             <input className="input" placeholder="20" inputMode="numeric" value={form.stock}
               onChange={(e) => setForm({ ...form, stock: digits(e.target.value) })} />
+          </div>
+          <div>
+            <Label>Photo (optional)</Label>
+            <ImagePicker
+              file={form.imageFile}
+              existingUrl=""
+              onPick={(f) => {
+                const problem = validateImage(f)
+                if (problem) return setError(problem)
+                setError('')
+                setForm({ ...form, imageFile: f })
+              }}
+              onRemove={() => setForm({ ...form, imageFile: null })}
+            />
           </div>
         </div>
 
@@ -189,6 +267,25 @@ export default function Products({ products, onAdd, onUpdate, onToggle, onRemove
                   <input className="input" inputMode="numeric" value={draft.stock}
                     onChange={(e) => setDraft({ ...draft, stock: digits(e.target.value) })} />
                 </div>
+                <div>
+                  <Label>Photo</Label>
+                  <ImagePicker
+                    file={draft.imageFile}
+                    existingUrl={p.imageUrl}
+                    removed={draft.removeImage}
+                    onPick={(f) => {
+                      const problem = validateImage(f)
+                      if (problem) return setRowError(problem)
+                      setRowError('')
+                      setDraft({ ...draft, imageFile: f, removeImage: false })
+                    }}
+                    onRemove={() =>
+                      draft.imageFile
+                        ? setDraft({ ...draft, imageFile: null })
+                        : setDraft({ ...draft, removeImage: true })
+                    }
+                  />
+                </div>
               </div>
 
               {rowError && <p className="mt-4 text-[15px] text-red-600">{rowError}</p>}
@@ -211,15 +308,23 @@ export default function Products({ products, onAdd, onUpdate, onToggle, onRemove
               key={p.id}
               className={`grid ${cols} items-center border-t border-line px-8 py-5`}
             >
-              <div>
-                <p className="font-display text-xl font-bold">{p.name}</p>
-                <p className="text-muted">
-                  {p.category}
-                  {p.unit && ` · ${p.unit}`}
-                </p>
+              <div className="flex items-center gap-4">
+                <ProductThumb product={p} className="h-14 w-14 text-3xl" />
+                <div className="min-w-0">
+                  <p className="font-display text-xl font-bold">{p.name}</p>
+                  <p className="text-muted">
+                    {p.category}
+                    {p.unit && ` · ${p.unit}`}
+                  </p>
+                </div>
               </div>
               <span className="font-display text-xl font-bold">₹{p.price}</span>
-              <span className="text-xl">{p.stock}</span>
+              <span className={'text-xl ' + (p.stock <= 5 ? 'font-bold text-brand' : '')}>
+                {p.stock}
+                {p.stock > 0 && p.stock <= 5 && (
+                  <span className="ml-2 text-[13px] font-medium">kam stock</span>
+                )}
+              </span>
               <button
                 role="switch"
                 aria-checked={p.inStock}

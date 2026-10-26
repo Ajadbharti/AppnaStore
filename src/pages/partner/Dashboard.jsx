@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { ClipboardList, IndianRupee, Truck, Package, BadgeCheck, Star, MapPin } from 'lucide-react'
 import OrderRow from '../../components/OrderRow'
 
-function Stat({ icon: Icon, value, label, accent }) {
+function Stat({ icon: Icon, value, label, accent, sub }) {
   return (
     <div
       className={
@@ -15,7 +15,17 @@ function Stat({ icon: Icon, value, label, accent }) {
       <Icon size={30} strokeWidth={1.7} className={accent ? 'text-white' : 'text-brand'} />
       <div>
         <div className="font-display text-5xl font-extrabold">{value}</div>
-        <div className={'mt-1 text-lg ' + (accent ? 'text-white/90' : 'text-muted')}>{label}</div>
+                <div className={'mt-1 text-lg ' + (accent ? 'text-white/90' : 'text-muted')}>{label}</div>
+        {sub && (
+          <div
+            className={
+              'mt-3 inline-block rounded-full px-3 py-1 text-[15px] font-medium ' +
+              (accent ? 'bg-white/20 text-white' : 'bg-sand text-leaf')
+            }
+          >
+            {sub}
+          </div>
+        )}
       </div>
     </div>
   )
@@ -55,8 +65,17 @@ export default function Dashboard({ shop, orders, products, onStatus }) {
   const todayKey = new Date().toDateString()
   const todayCount = orders.filter((o) => new Date(o.createdAt).toDateString() === todayKey).length
   const newOrders = orders.filter((o) => o.status === 'new')
-  const earnings = orders
+   const earnings = orders
     .filter((o) => o.status === 'delivered')
+    .reduce((sum, o) => sum + o.amount, 0)
+
+  // Aaj ki kamai: aaj deliver hue orders (purane orders mein delivery ka time na ho to order ka time)
+  const todayEarnings = orders
+    .filter(
+      (o) =>
+        o.status === 'delivered' &&
+        new Date(o.deliveredAt || o.createdAt).toDateString() === todayKey
+    )
     .reduce((sum, o) => sum + o.amount, 0)
   const outOfStock = products.filter((p) => !p.inStock || p.stock <= 0).length
 
@@ -76,7 +95,12 @@ export default function Dashboard({ shop, orders, products, onStatus }) {
       {/* 4 stat cards */}
       <div className="mt-10 grid gap-5 md:grid-cols-2">
         <Stat icon={ClipboardList} value={todayCount} label="Aaj ke orders" />
-        <Stat icon={IndianRupee} value={`₹${earnings.toLocaleString('en-IN')}`} label="Total kamai" />
+                <Stat
+          icon={IndianRupee}
+          value={`₹${earnings.toLocaleString('en-IN')}`}
+          label="Total kamai"
+          sub={`Aaj: ₹${todayEarnings.toLocaleString('en-IN')}`}
+        />
         <Stat icon={Truck} value={newOrders.length} label="Naye orders" accent />
         <Stat icon={Package} value={outOfStock} label="Out of stock" />
       </div>

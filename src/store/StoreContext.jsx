@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { productImageUrl } from '../lib/images'
 
 const StoreContext = createContext(null)
 
@@ -32,6 +33,7 @@ const toProduct = (r) => ({
   price: Number(r.price),
   stock: r.stock,
   inStock: r.in_stock,
+  imageUrl: productImageUrl(r.image_path),
   shopId: r.shop_id,
   shopName: r.shops?.shop_name ?? '',
   shopArea: r.shops?.area ?? '',
@@ -42,6 +44,7 @@ export function StoreProvider({ children }) {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [cartNotice, setCartNotice] = useState('')
 
   const [cart, setCart] = usePersistent('apnastore_cart_v2', []) // [{ id, qty }]
   const [wishlist, setWishlist] = usePersistent('apnastore_wishlist_v2', []) // [id, ...]
@@ -65,6 +68,7 @@ export function StoreProvider({ children }) {
     setLoading(false)
   }, [])
 
+  // Shuru mein, har 30 second mein, aur tab par wapas aane par
   useEffect(() => {
     loadProducts()
     const timer = setInterval(loadProducts, 30000)
@@ -74,6 +78,45 @@ export function StoreProvider({ children }) {
       window.removeEventListener('focus', loadProducts)
     }
   }, [loadProducts])
+
+  // Stock badalte hi turant naya data (Supabase Realtime)
+  useEffect(() => {
+    let timer
+    const channel = supabase
+      .channel('storefront-products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () => {
+        clearTimeout(timer)
+        timer = setTimeout(loadProducts, 400)
+      })
+      .subscribe()
+
+    return () => {
+      clearTimeout(timer)
+      supabase.removeChannel(channel)
+    }
+  }, [loadProducts])
+
+  // Stock kam ho gaya ya product hat gaya to cart apne aap theek karein
+  useEffect(() => {
+    if (loading || error) return
+    let changed = false
+    const next = cart.flatMap((c) => {
+      const p = products.find((x) => x.id === c.id)
+      if (!p) {
+        changed = true
+        return []
+      }
+      if (c.qty > p.stock) {
+        changed = true
+        return [{ ...c, qty: p.stock }]
+      }
+      return [c]
+    })
+    if (changed) {
+      setCart(next)
+      setCartNotice('Stock badalne ki wajah se cart mein kuch items kam ya hata diye gaye hain.')
+    }
+  }, [products, loading, error, cart, setCart])
 
   const cartItems = cart.flatMap((c) => {
     const p = products.find((x) => x.id === c.id)
@@ -115,18 +158,13 @@ export function StoreProvider({ children }) {
   const removeFromCart = (id) => setCart((prev) => prev.filter((c) => c.id !== id))
 
   // Alag-alag dukaan ke items ke liye alag order banta hai
-  const placeOrder = async ({ customer, phone, area, payment, captchaToken }) => {
+  const placeOrder = async ({ customer, phone, area, payment }) => {
     if (cartItems.length === 0) return { error: 'Cart khali hai', codes: [] }
 
-    // Session nahi hai to captcha ke saath anonymous session banayein
+    // Order ke liye login zaroori hai
     const { data: current } = await supabase.auth.getSession()
-    if (!current.session) {
-      const { error: authErr } = await supabase.auth.signInAnonymously({
-        options: { captchaToken },
-      })
-      if (authErr) {
-        return { error: 'Verification nahi ho paya. Captcha dobara poora karein.', codes: [] }
-      }
+    if (!current.session || current.session.user.is_anonymous) {
+      return { error: 'Order karne ke liye pehle login karein.', codes: [] }
     }
 
     const groups = {}
@@ -165,6 +203,7 @@ export function StoreProvider({ children }) {
       value={{
         products, loading, error, reload: loadProducts,
         cart, cartItems, cartCount, cartTotal,
+        cartNotice, clearCartNotice: () => setCartNotice(''),
         addToCart, changeQty, removeFromCart, placeOrder,
         wishlist, wishlistItems, toggleWishlist,
         location, setLocation,

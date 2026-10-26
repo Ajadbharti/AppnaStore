@@ -3,10 +3,12 @@ import { X, ClipboardList, KeyRound } from 'lucide-react'
 import { useMyOrders } from '../lib/useMyOrders'
 import { useAuth } from '../store/AuthContext'
 import { supabase } from '../lib/supabase'
+import OrderTimeline from './OrderTimeline'
 
 const statusInfo = {
   new: { label: 'Dukandar ke accept karne ka intezaar', cls: 'border-[#F6C9B0] bg-[#FCE7DA] text-brand' },
   accepted: { label: 'Accepted', cls: 'border-[#C5DCCB] bg-[#E3EFE6] text-leaf' },
+  out_for_delivery: { label: 'Raaste mein hai', cls: 'border-[#F6D9A8] bg-[#FCEFD6] text-[#B7791F]' },
   delivered: { label: 'Deliver ho gaya', cls: 'border-line bg-sand text-muted' },
   rejected: { label: 'Dukandar ne reject kiya', cls: 'border-red-200 bg-red-50 text-red-600' },
 }
@@ -130,8 +132,9 @@ export default function MyOrdersDrawer({ open, onClose }) {
                     <p className="mt-1 text-[15px] text-leaf">🏪 {o.shopName}</p>
                     <p className="mt-2 text-muted">{o.items}</p>
                     <p className="mt-2 font-display text-lg font-bold">₹{o.amount}</p>
+                    <OrderTimeline order={o} />
 
-                    {o.status === 'accepted' && o.otp && (
+                    {(o.status === 'accepted' || o.status === 'out_for_delivery') && o.otp && (
                       <div className="mt-4 rounded-2xl bg-white p-4 text-center">
                         <p className="flex items-center justify-center gap-2 text-[15px] text-muted">
                           <KeyRound size={18} className="text-brand" /> Delivery OTP

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import StoreHeader from '../components/StoreHeader'
 import Hero from '../components/Hero'
 import Categories from '../components/Categories'
@@ -9,20 +9,37 @@ import CartDrawer from '../components/CartDrawer'
 import WishlistDrawer from '../components/WishlistDrawer'
 import LocationModal from '../components/LocationModal'
 import MyOrdersDrawer from '../components/MyOrdersDrawer'
+import AccountDrawer from '../components/AccountDrawer'
 import { useStore } from '../store/StoreContext'
+import { useAuth } from '../store/AuthContext'
 import { matchesCategory } from '../data/categories'
 
 export default function Home() {
   const {
     products, loading, error, cartCount, wishlistItems, location, setLocation,
   } = useStore()
+  const { user } = useAuth()
 
-  const [cartOpen, setCartOpen] = useState(false)
+  // Login ke baad wapas aane par cart khula hua
+  const [cartOpen, setCartOpen] = useState(
+    () => localStorage.getItem('apnastore_open_cart') === '1'
+  )
   const [wishOpen, setWishOpen] = useState(false)
   const [locOpen, setLocOpen] = useState(false)
   const [ordersOpen, setOrdersOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState(null)
+
+  useEffect(() => {
+    localStorage.removeItem('apnastore_open_cart')
+  }, [])
+
+  // Header ke account button mein naam ka pehla akshar
+  const accountInitial = (user?.user_metadata?.full_name || user?.email || '')
+    .trim()
+    .charAt(0)
+    .toUpperCase()
 
   const pin = location?.pincode
   const inArea = pin ? products.filter((p) => p.pincode === pin) : products
@@ -59,6 +76,8 @@ export default function Home() {
         wishlistCount={wishlistItems.length}
         onLocationClick={() => setLocOpen(true)}
         onOrdersClick={() => setOrdersOpen(true)}
+        onAccountClick={() => setAccountOpen(true)}
+        accountInitial={accountInitial}
         location={location}
         search={search}
         onSearch={setSearch}
@@ -90,6 +109,11 @@ export default function Home() {
       />
       <WishlistDrawer open={wishOpen} onClose={() => setWishOpen(false)} />
       <MyOrdersDrawer open={ordersOpen} onClose={() => setOrdersOpen(false)} />
+      <AccountDrawer
+        open={accountOpen}
+        onClose={() => setAccountOpen(false)}
+        onViewOrders={() => setOrdersOpen(true)}
+      />
       {locOpen && (
         <LocationModal
           current={pin}

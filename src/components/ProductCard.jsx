@@ -10,8 +10,17 @@ export default function ProductCard({ product }) {
 
   return (
     <div className="card flex flex-col p-5">
-      <div className="relative grid h-32 place-items-center rounded-2xl bg-sand text-6xl">
-        {emojiFor(product.category)}
+      <div className="relative grid h-40 place-items-center overflow-hidden rounded-2xl bg-sand text-6xl">
+        {product.imageUrl ? (
+          <img
+            src={product.imageUrl}
+            alt={product.name}
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          emojiFor(product.category)
+        )}
 
         <button
           onClick={() => toggleWishlist(product.id)}
@@ -32,6 +41,17 @@ export default function ProductCard({ product }) {
         <p className="mt-1 text-[15px] font-medium text-leaf">
           🏪 {product.shopName}
           {product.shopArea && ` · ${product.shopArea}`}
+        </p>
+      )}
+
+      {available && (
+        <p
+          className={
+            'mt-2 text-[14px] font-medium ' +
+            (product.stock <= 5 ? 'text-brand' : 'text-muted')
+          }
+        >
+          {product.stock <= 5 ? `Sirf ${product.stock} bache hain` : `${product.stock} available`}
         </p>
       )}
 

@@ -3,6 +3,7 @@ import { useState } from 'react'
 const badges = {
   new: { label: 'Naya', cls: 'border-[#F6C9B0] bg-[#FCE7DA] text-brand' },
   accepted: { label: 'Accepted', cls: 'border-[#C5DCCB] bg-[#E3EFE6] text-leaf' },
+  out_for_delivery: { label: 'Raaste mein', cls: 'border-[#F6D9A8] bg-[#FCEFD6] text-[#B7791F]' },
   delivered: { label: 'Delivered', cls: 'border-line bg-sand text-muted' },
   rejected: { label: 'Rejected', cls: 'border-red-200 bg-red-50 text-red-600' },
 }
@@ -56,7 +57,16 @@ export default function OrderRow({ order, onStatus, onDeliver, detailed }) {
           </>
         )}
 
-        {order.status === 'accepted' && onDeliver && (
+        {order.status === 'accepted' && (
+          <button
+            className="btn-primary btn-sm"
+            onClick={() => onStatus(order.id, 'out_for_delivery')}
+          >
+            Delivery ke liye nikla
+          </button>
+        )}
+
+        {order.status === 'out_for_delivery' && onDeliver && (
           <div className="flex items-center gap-3">
             <input
               className="input !h-12 !w-32 text-center tracking-[0.3em]"

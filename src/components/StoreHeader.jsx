@@ -1,4 +1,4 @@
-import { MapPin, Search, ShoppingBag, Heart, ClipboardList } from 'lucide-react'
+import { MapPin, Search, ShoppingBag, Heart, ClipboardList, User } from 'lucide-react'
 import Logo from './Logo'
 
 function Badge({ n }) {
@@ -16,6 +16,8 @@ export default function StoreHeader({
   onWishlistClick,
   wishlistCount = 0,
   onOrdersClick,
+  onAccountClick,
+  accountInitial = '',
   onLocationClick,
   location,
   search = '',
@@ -45,7 +47,7 @@ export default function StoreHeader({
           />
         </div>
 
-                <button
+        <button
           onClick={onOrdersClick}
           className="flex h-11 cursor-pointer items-center gap-2 rounded-full border border-line bg-white px-3.5 text-[15px] font-medium"
           aria-label="Mere orders"
@@ -70,6 +72,20 @@ export default function StoreHeader({
         >
           <ShoppingBag size={20} />
           <Badge n={cartCount} />
+        </button>
+
+        <button
+          onClick={onAccountClick}
+          className={
+            'grid h-11 w-11 cursor-pointer place-items-center rounded-full border text-[17px] font-bold ' +
+            (accountInitial
+              ? 'border-transparent bg-gradient-to-br from-brand to-brand-2 text-white'
+              : 'border-line bg-white text-ink')
+          }
+          aria-label="Mera account"
+          title="Mera account"
+        >
+          {accountInitial || <User size={20} />}
         </button>
       </div>
     </header>

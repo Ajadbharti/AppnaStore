@@ -1,19 +1,33 @@
-import { useState } from 'react'
-import { X, ShoppingBag, Plus, Minus, Trash2, CheckCircle2 } from 'lucide-react'
-import { emojiFor } from '../data/categories'
+import { useEffect, useState } from 'react'
+import { X, ShoppingBag, Plus, Minus, Trash2, CheckCircle2, ShieldCheck } from 'lucide-react'
 import { useStore } from '../store/StoreContext'
 import { useAuth } from '../store/AuthContext'
-import Captcha from './Captcha'
+import { useCustomerProfile } from '../lib/useCustomerProfile'
+import { supabase } from '../lib/supabase'
+import ProductThumb from './ProductThumb'
 
 export default function CartDrawer({ open, onClose, onViewOrders }) {
-  const { cartItems, cartTotal, changeQty, removeFromCart, placeOrder } = useStore()
-  const { session } = useAuth()
+  const {
+    cartItems, cartTotal, changeQty, removeFromCart, placeOrder, cartNotice, clearCartNotice,
+  } = useStore()
+  const { user } = useAuth() // sirf asli (Google/email) login, guest nahi
+  const { profile, save: saveProfile } = useCustomerProfile(open)
+
   const [form, setForm] = useState({ customer: '', phone: '', area: '', payment: 'COD' })
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [placed, setPlaced] = useState(null) // order codes ki list
-  const [captcha, setCaptcha] = useState(null)
-  const [captchaKey, setCaptchaKey] = useState(0)
+
+  // Login hai aur profile bhari hai to form pehle se bhar dein
+  useEffect(() => {
+    if (!profile) return
+    setForm((f) => ({
+      ...f,
+      customer: f.customer || profile.name || '',
+      phone: f.phone || profile.phone || '',
+      area: f.area || profile.area || '',
+    }))
+  }, [profile])
 
   if (!open) return null
 
@@ -23,11 +37,25 @@ export default function CartDrawer({ open, onClose, onViewOrders }) {
     onClose()
   }
 
+  // Google se login. Wapas aane par cart apne aap khul jayega
+  const login = async () => {
+    setError('')
+    localStorage.setItem('apnastore_open_cart', '1')
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    })
+    if (err) {
+      localStorage.removeItem('apnastore_open_cart')
+      setError(err.message)
+    }
+  }
+
   const submit = async () => {
+    if (!user) return login()
     if (!form.customer.trim()) return setError('Apna naam likhein')
     if (!/^[6-9]\d{9}$/.test(form.phone)) return setError('10 digit ka sahi mobile number likhein')
     if (!form.area.trim()) return setError('Delivery area likhein')
-    if (!session && !captcha) return setError('Pehle captcha poora karein')
 
     setError('')
     setBusy(true)
@@ -35,13 +63,8 @@ export default function CartDrawer({ open, onClose, onViewOrders }) {
       ...form,
       customer: form.customer.trim(),
       area: form.area.trim(),
-      captchaToken: captcha,
     })
     setBusy(false)
-
-    // Captcha ka token ek hi baar chalta hai
-    setCaptcha(null)
-    setCaptchaKey((k) => k + 1)
 
     if (res.error) {
       setError(
@@ -51,6 +74,16 @@ export default function CartDrawer({ open, onClose, onViewOrders }) {
       return
     }
     setPlaced(res.codes)
+
+    // Profile khali hai to pehle order ki jaankari save kar lein
+    if (!profile?.phone) {
+      saveProfile({
+        name: form.customer.trim(),
+        phone: form.phone,
+        area: form.area.trim(),
+        address: profile?.address || '',
+      })
+    }
   }
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
@@ -82,7 +115,8 @@ export default function CartDrawer({ open, onClose, onViewOrders }) {
             <CheckCircle2 size={72} className="text-leaf" strokeWidth={1.5} />
             <p className="font-display text-3xl font-bold">Order ho gaya!</p>
             <p className="text-xl text-muted">
-              Order number: {placed.join(', ')}. Dukandar jaldi accept karenge.
+              Order number: {placed.join(', ')}. Dukandar accept karenge to Mere Orders mein
+              status aur delivery OTP dikhega.
             </p>
             <div className="mt-4 flex flex-wrap justify-center gap-3">
               {onViewOrders && (
@@ -116,9 +150,7 @@ export default function CartDrawer({ open, onClose, onViewOrders }) {
               <div className="flex flex-col gap-3">
                 {cartItems.map((i) => (
                   <div key={i.id} className="card flex items-center gap-4 p-4">
-                    <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-sand text-3xl">
-                      {emojiFor(i.category)}
-                    </span>
+                    <ProductThumb product={i} className="h-14 w-14 text-3xl" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-display text-lg font-bold">{i.name}</p>
                       <p className="text-muted">{i.unit && `${i.unit} · `}₹{i.price}</p>
@@ -159,35 +191,66 @@ export default function CartDrawer({ open, onClose, onViewOrders }) {
                 </p>
               )}
 
-              <div className="mt-6 grid gap-3 pb-6">
-                <input className="input" placeholder="Aapka naam" value={form.customer} onChange={set('customer')} />
-                <input
-                  className="input" placeholder="Mobile number" inputMode="numeric" maxLength={10}
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
-                />
-                <input className="input" placeholder="Delivery area / mohalla" value={form.area} onChange={set('area')} />
+              {cartNotice && (
+                <p className="mt-4 flex items-start justify-between gap-3 rounded-2xl bg-[#FCEFD6] px-4 py-3 text-[15px] text-[#8A5A12]">
+                  <span>{cartNotice}</span>
+                  <button
+                    onClick={clearCartNotice}
+                    className="shrink-0 cursor-pointer border-0 bg-transparent text-[#8A5A12] underline"
+                  >
+                    Theek hai
+                  </button>
+                </p>
+              )}
 
-                <div className="flex gap-3">
-                  {['COD', 'UPI'].map((m) => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setForm({ ...form, payment: m })}
-                      className={
-                        'flex-1 cursor-pointer rounded-full border px-5 py-3 text-[17px] font-medium ' +
-                        (form.payment === m
-                          ? 'border-leaf bg-leaf text-white'
-                          : 'border-line bg-white text-ink')
-                      }
-                    >
-                      {m === 'COD' ? 'Cash on Delivery' : 'UPI'}
-                    </button>
-                  ))}
+              {/* Login nahi hai: form ki jagah login card */}
+              {!user && (
+                <div className="card mb-6 mt-6 p-6 text-center">
+                  <ShieldCheck size={40} className="mx-auto text-leaf" strokeWidth={1.6} />
+                  <h3 className="mt-3 font-display text-xl font-bold">
+                    Order karne ke liye login karein
+                  </h3>
+                  <p className="mt-2 text-[15px] text-muted">
+                    Google se ek click mein aapka account ban jayega. Aapka cart safe rahega,
+                    login ke baad wapas yahin aayenge.
+                  </p>
+                  <button className="btn-primary mt-5 w-full text-lg" onClick={login}>
+                    <span className="font-bold">G</span> Google se login karein
+                  </button>
                 </div>
+              )}
 
-                {!session && <Captcha onToken={setCaptcha} resetKey={captchaKey} />}
-              </div>
+              {/* Login hai: delivery ka form */}
+              {user && (
+                <div className="mt-6 grid gap-3 pb-6">
+                  <p className="text-[14px] text-muted">✅ {user.email} se login hain</p>
+                  <input className="input" placeholder="Aapka naam" value={form.customer} onChange={set('customer')} />
+                  <input
+                    className="input" placeholder="Mobile number" inputMode="numeric" maxLength={10}
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
+                  />
+                  <input className="input" placeholder="Delivery area / mohalla" value={form.area} onChange={set('area')} />
+
+                  <div className="flex gap-3">
+                    {['COD', 'UPI'].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setForm({ ...form, payment: m })}
+                        className={
+                          'flex-1 cursor-pointer rounded-full border px-5 py-3 text-[17px] font-medium ' +
+                          (form.payment === m
+                            ? 'border-leaf bg-leaf text-white'
+                            : 'border-line bg-white text-ink')
+                        }
+                      >
+                        {m === 'COD' ? 'Cash on Delivery' : 'UPI'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-line bg-white p-8">
@@ -201,7 +264,11 @@ export default function CartDrawer({ open, onClose, onViewOrders }) {
                 onClick={submit}
                 disabled={busy}
               >
-                {busy ? 'Order ho raha hai...' : 'Order place karein'}
+                {!user
+                  ? 'Login karke order karein'
+                  : busy
+                  ? 'Order ho raha hai...'
+                  : 'Order place karein'}
               </button>
             </div>
           </>
