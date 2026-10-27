@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import PartnerHeader from '../components/PartnerHeader'
 import PartnerTabs from '../components/PartnerTabs'
+import ShopStatusBanner from '../components/ShopStatusBanner'
 import Dashboard from './partner/Dashboard'
 import Orders from './partner/Orders'
 import Products from './partner/Products'
@@ -19,6 +20,7 @@ export default function Partner() {
       <PartnerHeader shop={shop} />
 
       <main className="mx-auto max-w-[1400px] px-8 pb-24">
+        <ShopStatusBanner shop={shop} />
         <PartnerTabs newCount={newCount} />
 
         {data.error && (
@@ -41,7 +43,7 @@ export default function Partner() {
           />
           <Route
             path="orders"
-                        element={
+            element={
               <Orders
                 orders={data.orders}
                 onStatus={data.setOrderStatus}
@@ -52,7 +54,7 @@ export default function Partner() {
           <Route
             path="products"
             element={
-                           <Products
+              <Products
                 products={data.products}
                 onAdd={data.addProduct}
                 onUpdate={data.updateProduct}

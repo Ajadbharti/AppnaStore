@@ -15,7 +15,7 @@ function Stat({ icon: Icon, value, label, accent, sub }) {
       <Icon size={30} strokeWidth={1.7} className={accent ? 'text-white' : 'text-brand'} />
       <div>
         <div className="font-display text-5xl font-extrabold">{value}</div>
-                <div className={'mt-1 text-lg ' + (accent ? 'text-white/90' : 'text-muted')}>{label}</div>
+        <div className={'mt-1 text-lg ' + (accent ? 'text-white/90' : 'text-muted')}>{label}</div>
         {sub && (
           <div
             className={
@@ -65,7 +65,9 @@ export default function Dashboard({ shop, orders, products, onStatus }) {
   const todayKey = new Date().toDateString()
   const todayCount = orders.filter((o) => new Date(o.createdAt).toDateString() === todayKey).length
   const newOrders = orders.filter((o) => o.status === 'new')
-   const earnings = orders
+
+  // Kamai: sirf deliver hue orders
+  const earnings = orders
     .filter((o) => o.status === 'delivered')
     .reduce((sum, o) => sum + o.amount, 0)
 
@@ -77,6 +79,7 @@ export default function Dashboard({ shop, orders, products, onStatus }) {
         new Date(o.deliveredAt || o.createdAt).toDateString() === todayKey
     )
     .reduce((sum, o) => sum + o.amount, 0)
+
   const outOfStock = products.filter((p) => !p.inStock || p.stock <= 0).length
 
   const week = lastSevenDays(orders)
@@ -95,7 +98,7 @@ export default function Dashboard({ shop, orders, products, onStatus }) {
       {/* 4 stat cards */}
       <div className="mt-10 grid gap-5 md:grid-cols-2">
         <Stat icon={ClipboardList} value={todayCount} label="Aaj ke orders" />
-                <Stat
+        <Stat
           icon={IndianRupee}
           value={`₹${earnings.toLocaleString('en-IN')}`}
           label="Total kamai"
@@ -132,14 +135,26 @@ export default function Dashboard({ shop, orders, products, onStatus }) {
         <h2 className="font-display text-2xl font-bold">Dukaan ki halat</h2>
         <div className="mt-5">
           <Row label="Verification">
-            <span className="flex items-center gap-2 text-leaf">
-              <BadgeCheck size={22} /> Documents jama
-            </span>
+            {shop.status === 'approved' ? (
+              <span className="flex items-center gap-2 text-leaf">
+                <BadgeCheck size={22} /> Verify ho chuki hai
+              </span>
+            ) : shop.status === 'rejected' ? (
+              <span className="flex items-center gap-2 text-red-600">
+                <Star size={22} /> Approve nahi hui
+              </span>
+            ) : (
+              <span className="flex items-center gap-2 text-brand">
+                <Star size={22} /> Review chal raha hai
+              </span>
+            )}
           </Row>
           <Row label="Dukaan live">
-            <span className="flex items-center gap-2 text-brand">
-              <Star size={22} /> 2 ghante mein
-            </span>
+            {shop.status === 'approved' ? (
+              <span className="text-leaf">Haan, customers ko dikh rahi hai</span>
+            ) : (
+              <span className="text-muted">Abhi nahi</span>
+            )}
           </Row>
           <Row label="Rating">
             <span className="flex items-center gap-2 text-muted">
